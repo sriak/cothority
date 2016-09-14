@@ -6,6 +6,7 @@ import (
 	_ "github.com/dedis/cosi/service"
 	_ "github.com/dedis/cothority/services/guard"
 	_ "github.com/dedis/cothority/services/identity"
+	_ "github.com/dedis/cothority/services/prifi"
 	_ "github.com/dedis/cothority/services/skipchain"
 	_ "github.com/dedis/cothority/services/status"
 	_ "github.com/dedis/cothority/services/template"
