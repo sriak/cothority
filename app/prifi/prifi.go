@@ -16,6 +16,7 @@ import (
 	"github.com/dedis/cothority/app/lib/server"
 	"github.com/dedis/cothority/log"
 	"github.com/dedis/cothority/sda"
+	"github.com/dedis/cothority/services/prifi"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -86,7 +87,9 @@ func trustee(c *cli.Context) error {
 	log.Info("Starting trustee")
 	host, err := cothorityd(c)
 	log.ErrFatal(err)
+	prifi := host.GetService(prifi.ServiceName).(*prifi.Service)
 	// Do other setups
+	log.ErrFatal(prifi.StartTrustee())
 
 	// Wait for the end of the world
 	if !c.GlobalBool("nowait") {
@@ -100,6 +103,9 @@ func relay(c *cli.Context) error {
 	log.Info("Starting relay")
 	host, err := cothorityd(c)
 	log.ErrFatal(err)
+	prifi := host.GetService(prifi.ServiceName).(*prifi.Service)
+	// Do other setups
+	log.ErrFatal(prifi.StartRelay())
 
 	// Wait for the end of the world
 	if !c.GlobalBool("nowait") {
@@ -113,6 +119,9 @@ func client(c *cli.Context) error {
 	log.Info("Starting client")
 	host, err := cothorityd(c)
 	log.ErrFatal(err)
+	prifi := host.GetService(prifi.ServiceName).(*prifi.Service)
+	// Do other setups
+	log.ErrFatal(prifi.StartClient())
 
 	// Wait for the end of the world
 	if !c.GlobalBool("nowait") {
@@ -128,6 +137,7 @@ func setupCothorityd(c *cli.Context) error {
 }
 
 // Starts the cothorityd to enable communication with the prifi-service.
+// Returns the prifi-service.
 func cothorityd(c *cli.Context) (*sda.Host, error) {
 	// first check the options
 	cfile := c.GlobalString("config")

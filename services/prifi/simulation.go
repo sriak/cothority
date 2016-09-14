@@ -45,4 +45,5 @@ func (e *simulation) Setup(dir string, hosts []string) (
 // Run is used on the destination machines and runs a number of
 // rounds
 func (e *simulation) Run(config *sda.SimulationConfig) error {
+	return nil
 }

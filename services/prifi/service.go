@@ -6,7 +6,12 @@ package prifi
  */
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+
 	"github.com/dedis/cothority/log"
+	"github.com/dedis/cothority/network"
 	"github.com/dedis/cothority/sda"
 )
 
@@ -26,7 +31,14 @@ type Service struct {
 	// We need to embed the ServiceProcessor, so that incoming messages
 	// are correctly handled.
 	*sda.ServiceProcessor
-	path string
+	Storage *Storage
+	path    string
+}
+
+// This structure will be saved, on the contrary of the 'Service'-structure
+// which has per-service information stored
+type Storage struct {
+	TrusteeID string
 }
 
 // StartTrustee has to take a configuration and start the necessary
@@ -65,6 +77,39 @@ func (s *Service) NewProtocol(tn *sda.TreeNodeInstance, conf *sda.GenericConfig)
 	return nil, nil
 }
 
+// saves the actual identity
+func (s *Service) save() {
+	log.Lvl3("Saving service")
+	b, err := network.MarshalRegisteredType(s.Storage)
+	if err != nil {
+		log.Error("Couldn't marshal service:", err)
+	} else {
+		err = ioutil.WriteFile(s.path+"/prifi.bin", b, 0660)
+		if err != nil {
+			log.Error("Couldn't save file:", err)
+		}
+	}
+}
+
+// Tries to load the configuration and updates if a configuration
+// is found, else it returns an error.
+func (s *Service) tryLoad() error {
+	configFile := s.path + "/identity.bin"
+	b, err := ioutil.ReadFile(configFile)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Error while reading %s: %s", configFile, err)
+	}
+	if len(b) > 0 {
+		_, msg, err := network.UnmarshalRegistered(b)
+		if err != nil {
+			return fmt.Errorf("Couldn't unmarshal: %s", err)
+		}
+		log.Lvl3("Successfully loaded")
+		s.Storage = msg.(*Storage)
+	}
+	return nil
+}
+
 // newTemplate receives the context and a path where it can write its
 // configuration, if desired. As we don't know when the service will exit,
 // we need to save the configuration on our own from time to time.
@@ -72,6 +117,9 @@ func newService(c *sda.Context, path string) sda.Service {
 	s := &Service{
 		ServiceProcessor: sda.NewServiceProcessor(c),
 		path:             path,
+	}
+	if err := s.tryLoad(); err != nil {
+		log.Error(err)
 	}
 	return s
 }
