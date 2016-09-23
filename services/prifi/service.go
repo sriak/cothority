@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/dedis/cothority/app/lib/config"
 	"github.com/dedis/cothority/log"
 	"github.com/dedis/cothority/network"
 	"github.com/dedis/cothority/sda"
@@ -51,7 +52,7 @@ func (s *Service) StartTrustee() error {
 
 // StartRelay has to take a configuration and start the necessary
 // protocols to enable the relay-mode.
-func (s *Service) StartRelay() error {
+func (s *Service) StartRelay(group *config.Group) error {
 	log.Info("Service", s, "running in relay mode")
 	// Set up the configuration
 	return nil

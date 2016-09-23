@@ -46,10 +46,11 @@ func main() {
 			Action:  trustee,
 		},
 		{
-			Name:    "relay",
-			Usage:   "start in relay mode",
-			Aliases: []string{"r"},
-			Action:  relay,
+			Name:      "relay",
+			Usage:     "start in relay mode",
+			ArgsUsage: "group [id-name]",
+			Aliases:   []string{"r"},
+			Action:    relay,
 		},
 		{
 			Name:    "client",
@@ -105,7 +106,11 @@ func relay(c *cli.Context) error {
 	log.ErrFatal(err)
 	prifi := host.GetService(prifi.ServiceName).(*prifi.Service)
 	// Do other setups
-	log.ErrFatal(prifi.StartRelay())
+	if c.NArg() == 0 {
+		log.Fatal("Please give a group-definition")
+	}
+	group := getGroup(c)
+	log.ErrFatal(prifi.StartRelay(group))
 
 	// Wait for the end of the world
 	if !c.GlobalBool("nowait") {
@@ -174,4 +179,18 @@ func getDefaultConfigFile() string {
 		return path.Join(u.HomeDir, ".config", DefaultName, DefaultServerConfig)
 		// TODO WIndows ? FreeBSD ?
 	}
+}
+
+// Reads the group-file and returns it
+func getGroup(c *cli.Context) *config.Group {
+	gfile := c.Args().Get(0)
+	gr, err := os.Open(gfile)
+	log.ErrFatal(err)
+	defer gr.Close()
+	groups, err := config.ReadGroupDescToml(gr)
+	log.ErrFatal(err)
+	if groups == nil || groups.Roster == nil || len(groups.Roster.List) == 0 {
+		log.Fatal("No servers found in roster from", gfile)
+	}
+	return groups
 }

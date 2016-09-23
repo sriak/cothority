@@ -21,6 +21,9 @@ main(){
 }
 
 testSetup(){
+	for n in $(seq $NBR); do
+		runCfg $n
+	done
 	testOK runPrifi 1 -nowait trustee
 	testOK runPrifi 2 -nowait trustee
 	testOK runPrifi 3 -nowait relay
