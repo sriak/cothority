@@ -13,8 +13,6 @@ import (
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/base64"
-	//TODO to remove
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -267,10 +265,6 @@ func (jv *JVSS) finaliseSecret(sid SID) error {
 		// Initialise Schnorr struct for long-term shared secret if not done so before
 		if sid.IsLTSS() && !jv.ltssInit {
 			jv.ltssInit = true
-			// TODO find how to get it from jvss
-			rpb, _ := secret.secret.Pub.SecretCommit().MarshalBinary()
-			fmt.Println(hex.EncodeToString(rpb))
-
 			jv.schnorr.Init(jv.keyPair.Suite, jv.info, secret.secret)
 			log.Lvlf4("Node %d: %v Schnorr struct initialised",
 				jv.Index(), sid)
