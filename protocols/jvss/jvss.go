@@ -11,7 +11,10 @@ package jvss
 
 import (
 	"crypto/rand"
+	"crypto/sha512"
 	"encoding/base64"
+	//TODO to remove
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,11 +24,11 @@ import (
 	"github.com/dedis/cothority/sda"
 	"github.com/dedis/crypto/abstract"
 	"github.com/dedis/crypto/config"
-	"github.com/dedis/crypto/poly"
+	"github.com/sriak/crypto/poly"
 )
 
 func init() {
-	sda.GlobalProtocolRegister("JVSS", NewJVSS)
+	sda.ProtocolRegisterName("JVSS", NewJVSS)
 }
 
 // SID is the type of shared secret identifiers
@@ -52,7 +55,6 @@ type JVSS struct {
 	schnorr               *poly.Schnorr    // Long-term Schnorr struct to compute distributed signatures
 	secrets               *sharedSecrets   // Shared secrets (long- and short-term ones)
 	ltssInit              bool             // Indicator whether shared secret has been already initialised or not
-	treeIndex             int              // the index of this node in the flattened tree
 
 	longTermSecDone  chan bool // Channel to indicate when long-term shared secrets of all peers are ready
 	shortTermSecDone chan bool // Channel to indicate when short-term shared secrets of all peers are ready
@@ -69,11 +71,7 @@ func NewJVSS(node *sda.TreeNodeInstance) (sda.ProtocolInstance, error) {
 	kp := &config.KeyPair{Suite: node.Suite(), Public: node.Public(), Secret: node.Private()}
 	n := len(node.List())
 	pk := make([]abstract.Point, n)
-	var idx int
 	for i, tn := range node.List() {
-		if tn.ServerIdentity.Public.Equal(node.Public()) {
-			idx = i
-		}
 		pk[i] = tn.ServerIdentity.Public
 	}
 	// NOTE: T <= R <= N (for simplicity we use T = R = N; might change later)
@@ -83,7 +81,6 @@ func NewJVSS(node *sda.TreeNodeInstance) (sda.ProtocolInstance, error) {
 		TreeNodeInstance: node,
 		keyPair:          kp,
 		pubKeys:          pk,
-		treeIndex:        idx,
 		info:             info,
 		schnorr:          new(poly.Schnorr),
 		secrets:          newSecrets(),
@@ -133,9 +130,11 @@ func (jv *JVSS) Verify(msg []byte, sig *poly.SchnorrSig) error {
 		return fmt.Errorf("Error, long-term shared secret has not been initialised")
 	}
 
-	h := jv.keyPair.Suite.Hash()
-	_, _ = h.Write(msg) // ignore error; verification wil fail anyways
-	return jv.schnorr.VerifySchnorrSig(sig, h)
+	//h := jv.keyPair.Suite.Hash()
+	// TODO
+	h := sha512.New()
+	//_, _ = h.Write(msg) // ignore error; verification wil fail anyways
+	return jv.schnorr.VerifySchnorrSig(sig, h, msg)
 }
 
 // Sign starts a new signing request amongst the JVSS group and returns a
@@ -208,7 +207,6 @@ func (jv *JVSS) initSecret(sid SID) error {
 
 	secret, err := jv.secrets.secret(sid)
 	if err != nil { // this should never happen here
-		log.Error(err)
 		return err
 	}
 
@@ -225,7 +223,6 @@ func (jv *JVSS) initSecret(sid SID) error {
 			Deal: db,
 		}
 		if err := jv.Broadcast(msg); err != nil {
-			log.Print(jv.Name(), "Error broadcast secInit:", err)
 			return err
 		}
 	}
@@ -242,9 +239,9 @@ func (jv *JVSS) finaliseSecret(sid SID) error {
 		len(jv.List()))
 
 	if len(secret.deals) == jv.info.T {
+
 		for _, deal := range secret.deals {
 			if _, err := secret.receiver.AddDeal(jv.Index(), deal); err != nil {
-				log.Error(jv.Index(), err)
 				return err
 			}
 		}
@@ -270,6 +267,10 @@ func (jv *JVSS) finaliseSecret(sid SID) error {
 		// Initialise Schnorr struct for long-term shared secret if not done so before
 		if sid.IsLTSS() && !jv.ltssInit {
 			jv.ltssInit = true
+			// TODO find how to get it from jvss
+			rpb, _ := secret.secret.Pub.SecretCommit().MarshalBinary()
+			fmt.Println(hex.EncodeToString(rpb))
+
 			jv.schnorr.Init(jv.keyPair.Suite, jv.info, secret.secret)
 			log.Lvlf4("Node %d: %v Schnorr struct initialised",
 				jv.Index(), sid)
@@ -281,7 +282,6 @@ func (jv *JVSS) finaliseSecret(sid SID) error {
 			SID: sid,
 		}
 		if err := jv.Broadcast(msg); err != nil {
-			log.Error(err)
 			return err
 		}
 	}
@@ -294,11 +294,13 @@ func (jv *JVSS) sigPartial(sid SID, msg []byte) (*poly.SchnorrPartialSig, error)
 		return nil, err
 	}
 
-	hash := jv.keyPair.Suite.Hash()
-	if _, err := hash.Write(msg); err != nil {
-		return nil, err
-	}
-	if err := jv.schnorr.NewRound(secret.secret, hash); err != nil {
+	//hash := jv.keyPair.Suite.Hash()
+	// TODO
+	hash := sha512.New()
+	//if _, err := hash.Write(msg); err != nil {
+	//	return nil, err
+	//}
+	if err := jv.schnorr.NewRound(secret.secret, hash, msg); err != nil {
 		return nil, err
 	}
 	ps := jv.schnorr.RevealPartialSig()
@@ -306,11 +308,6 @@ func (jv *JVSS) sigPartial(sid SID, msg []byte) (*poly.SchnorrPartialSig, error)
 		return nil, fmt.Errorf("Error, node %d could not create partial signature", jv.Index())
 	}
 	return ps, nil
-}
-
-// Index returns the index of this node in the flattened tree.
-func (jv *JVSS) Index() int {
-	return jv.treeIndex
 }
 
 // thread safe helpers for accessing shared (long and short-term) secrets:
