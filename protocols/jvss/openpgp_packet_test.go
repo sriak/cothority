@@ -37,7 +37,7 @@ func TestSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal("Couldn't serialize signature: ", err)
 	}
-	err = ioutil.WriteFile("text.pgp", buffer.Bytes(), 0644)
+	err = ioutil.WriteFile("text.sig", buffer.Bytes(), 0644)
 	if err != nil {
 		t.Fatal("Couldn't write signature: ", err)
 	}
